@@ -1,5 +1,7 @@
 package org.jsoup.nodes;
 
+import java.io.IOException;
+
 import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
 
@@ -28,7 +30,7 @@ public class TextNode extends Node {
         this.text = text;
     }
 
-    public String nodeName() {
+	public String nodeName() {
         return "#text";
     }
     
@@ -89,7 +91,7 @@ public class TextNode extends Node {
         return tailNode;
     }
 
-    void outerHtmlHead(StringBuilder accum, int depth, Document.OutputSettings out) {
+	void outerHtmlHead(Appendable accum, int depth, Document.OutputSettings out) throws IOException {
         if (out.prettyPrint() && ((siblingIndex() == 0 && parentNode instanceof Element && ((Element) parentNode).tag().formatAsBlock() && !isBlank()) || (out.outline() && siblingNodes().size()>0 && !isBlank()) ))
             indent(accum, depth, out);
 
@@ -98,7 +100,7 @@ public class TextNode extends Node {
         Entities.escape(accum, getWholeText(), out, false, normaliseWhite, false);
     }
 
-    void outerHtmlTail(StringBuilder accum, int depth, Document.OutputSettings out) {}
+	void outerHtmlTail(Appendable accum, int depth, Document.OutputSettings out) {}
 
     @Override
     public String toString() {
@@ -171,23 +173,5 @@ public class TextNode extends Node {
     public String absUrl(String attributeKey) {
         ensureAttributes();
         return super.absUrl(attributeKey);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-
-        TextNode textNode = (TextNode) o;
-
-        return !(text != null ? !text.equals(textNode.text) : textNode.text != null);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = super.hashCode();
-        result = 31 * result + (text != null ? text.hashCode() : 0);
-        return result;
     }
 }

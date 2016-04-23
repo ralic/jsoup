@@ -4,9 +4,22 @@ import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
 import org.jsoup.parser.Parser;
 import org.jsoup.parser.Tag;
-import org.jsoup.select.*;
+import org.jsoup.select.Collector;
+import org.jsoup.select.Elements;
+import org.jsoup.select.Evaluator;
+import org.jsoup.select.NodeTraversor;
+import org.jsoup.select.NodeVisitor;
+import org.jsoup.select.Selector;
 
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -358,6 +371,7 @@ public class Element extends Node {
      * @return this element
      */
     public Element appendText(String text) {
+        Validate.notNull(text);
         TextNode node = new TextNode(text, baseUri());
         appendChild(node);
         return this;
@@ -370,6 +384,7 @@ public class Element extends Node {
      * @return this element
      */
     public Element prependText(String text) {
+        Validate.notNull(text);
         TextNode node = new TextNode(text, baseUri());
         prependChild(node);
         return this;
@@ -483,7 +498,9 @@ public class Element extends Node {
         if (id().length() > 0)
             return "#" + id();
 
-        StringBuilder selector = new StringBuilder(tagName());
+        // Translate HTML namespace ns:tag to CSS namespace syntax ns|tag
+        String tagName = tagName().replace(':', '|');
+        StringBuilder selector = new StringBuilder(tagName);
         String classes = StringUtil.join(classNames(), ".");
         if (classes.length() > 0)
             selector.append('.').append(classes);
@@ -1133,9 +1150,15 @@ public class Element extends Node {
         return this;
     }
 
-    void outerHtmlHead(StringBuilder accum, int depth, Document.OutputSettings out) {
-        if (accum.length() > 0 && out.prettyPrint() && (tag.formatAsBlock() || (parent() != null && parent().tag().formatAsBlock()) || out.outline()) )
-            indent(accum, depth, out);
+    void outerHtmlHead(Appendable accum, int depth, Document.OutputSettings out) throws IOException {
+        if (out.prettyPrint() && (tag.formatAsBlock() || (parent() != null && parent().tag().formatAsBlock()) || out.outline())) {
+            if (accum instanceof StringBuilder) {
+                if (((StringBuilder) accum).length() > 0)
+                    indent(accum, depth, out);
+            } else {
+                indent(accum, depth, out);
+            }
+        }
         accum
                 .append("<")
                 .append(tagName());
@@ -1152,7 +1175,7 @@ public class Element extends Node {
             accum.append(">");
     }
 
-    void outerHtmlTail(StringBuilder accum, int depth, Document.OutputSettings out) {
+	void outerHtmlTail(Appendable accum, int depth, Document.OutputSettings out) throws IOException {
         if (!(childNodes.isEmpty() && tag.isSelfClosing())) {
             if (out.prettyPrint() && (!childNodes.isEmpty() && (
                     tag.formatAsBlock() || (out.outline() && (childNodes.size()>1 || (childNodes.size()==1 && !(childNodes.get(0) instanceof TextNode))))
@@ -1179,6 +1202,17 @@ public class Element extends Node {
         for (Node node : childNodes)
             node.outerHtml(accum);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T extends Appendable> T html(T appendable) {
+        for (Node node : childNodes)
+            node.outerHtml(appendable);
+
+        return appendable;
+    }
     
     /**
      * Set this element's inner HTML. Clears the existing HTML first.
@@ -1192,26 +1226,8 @@ public class Element extends Node {
         return this;
     }
 
-    public String toString() {
+	public String toString() {
         return outerHtml();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-
-        Element element = (Element) o;
-
-        return tag.equals(element.tag);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = super.hashCode();
-        result = 31 * result + (tag != null ? tag.hashCode() : 0);
-        return result;
     }
 
     @Override

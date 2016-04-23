@@ -1,11 +1,11 @@
 package org.jsoup;
 
 import org.jsoup.nodes.Document;
-import org.jsoup.parser.HtmlTreeBuilder;
 import org.jsoup.parser.Parser;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Proxy;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
@@ -58,6 +58,21 @@ public interface Connection {
      * @return this Connection, for chaining
      */
     Connection url(String url);
+
+    /**
+     * Set the proxy to use for this request. Set to <code>null</code> to disable.
+     * @param proxy proxy to use
+     * @return this Connection, for chaining
+     */
+    Connection proxy(Proxy proxy);
+
+    /**
+     * Set the HTTP proxy to use for this request.
+     * @param host the proxy hostname
+     * @param port the proxy port
+     * @return this Connection, for chaining
+     */
+    Connection proxy(String host, int port);
 
     /**
      * Set the request user-agent header.
@@ -185,6 +200,25 @@ public interface Connection {
      * @return this Connection, for chaining
      */
     Connection data(String... keyvals);
+
+    /**
+     * Get the data KeyVal for this key, if any
+     * @param key the data key
+     * @return null if not set
+     */
+    KeyVal data(String key);
+
+    /**
+     * Set a POST (or PUT) request body. Useful when a server expects a plain request body, not a set for URL
+     * encoded form key/value pairs. E.g.:
+     * <code><pre>Jsoup.connect(url)
+     * .requestBody(json)
+     * .header("Content-Type", "application/json")
+     * .post();</pre></code>
+     * If any data key/vals are supplied, they will be sent as URL query params.
+     * @return this Request, for chaining
+     */
+    Connection requestBody(String body);
 
     /**
      * Set a request header.
@@ -408,7 +442,26 @@ public interface Connection {
      * Represents a HTTP request.
      */
     interface Request extends Base<Request> {
+        /**
+         * Get the proxy used for this request.
+         * @return the proxy; <code>null</code> if not enabled.
+         */
+        Proxy proxy();
 
+        /**
+         * Update the proxy for this request.
+         * @param proxy the proxy ot use; <code>null</code> to disable.
+         * @return this Request, for chaining
+         */
+        Request proxy(Proxy proxy);
+
+        /**
+         * Set the HTTP proxy to use for this request.
+         * @param host the proxy hostname
+         * @param port the proxy port
+         * @return this Connection, for chaining
+         */
+        Request proxy(String host, int port);
 
         /**
          * Get the request timeout, in milliseconds.
@@ -501,6 +554,24 @@ public interface Connection {
          * @return collection of keyvals
          */
         Collection<KeyVal> data();
+
+        /**
+         * Set a POST (or PUT) request body. Useful when a server expects a plain request body, not a set for URL
+         * encoded form key/value pairs. E.g.:
+         * <code><pre>Jsoup.connect(url)
+         * .requestBody(json)
+         * .header("Content-Type", "application/json")
+         * .post();</pre></code>
+         * If any data key/vals are supplied, they will be sent as URL query params.
+         * @return this Request, for chaining
+         */
+        Request requestBody(String body);
+
+        /**
+         * Get the current request body.
+         * @return null if not set.
+         */
+        String requestBody();
 
         /**
          * Specify the parser to use when parsing the document.

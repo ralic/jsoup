@@ -1,13 +1,13 @@
 package org.jsoup.nodes;
 
+import org.jsoup.SerializationException;
 import org.jsoup.helper.StringUtil;
 import org.jsoup.helper.Validate;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.NodeTraversor;
 import org.jsoup.select.NodeVisitor;
 
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -437,13 +437,13 @@ public abstract class Node implements Cloneable {
 
     protected void addChildren(int index, Node... children) {
         Validate.noNullElements(children);
+        ensureChildNodes();
         for (int i = children.length - 1; i >= 0; i--) {
             Node in = children[i];
             reparentChild(in);
-            ensureChildNodes();
             childNodes.add(index, in);
+            reindexChildren(index);
         }
-        reindexChildren(index);
     }
 
     protected void ensureChildNodes() {
@@ -547,7 +547,7 @@ public abstract class Node implements Cloneable {
         return accum.toString();
     }
 
-    protected void outerHtml(StringBuilder accum) {
+    protected void outerHtml(Appendable accum) {
         new NodeTraversor(new OuterHtmlVisitor(accum, getOutputSettings())).traverse(this);
     }
 
@@ -559,49 +559,55 @@ public abstract class Node implements Cloneable {
     /**
      Get the outer HTML of this node.
      @param accum accumulator to place HTML into
+     @throws IOException if appending to the given accumulator fails.
      */
-    abstract void outerHtmlHead(StringBuilder accum, int depth, Document.OutputSettings out);
+    abstract void outerHtmlHead(Appendable accum, int depth, Document.OutputSettings out) throws IOException;
 
-    abstract void outerHtmlTail(StringBuilder accum, int depth, Document.OutputSettings out);
+    abstract void outerHtmlTail(Appendable accum, int depth, Document.OutputSettings out) throws IOException;
 
-    @Override
-    public String toString() {
+    /**
+     * Write this node and its children to the given {@link Appendable}.
+     *
+     * @param appendable the {@link Appendable} to write to.
+     * @return the supplied {@link Appendable}, for chaining.
+     */
+    public <T extends Appendable> T html(T appendable) {
+        outerHtml(appendable);
+        return appendable;
+    }
+    
+	public String toString() {
         return outerHtml();
     }
 
-    protected void indent(StringBuilder accum, int depth, Document.OutputSettings out) {
+    protected void indent(Appendable accum, int depth, Document.OutputSettings out) throws IOException {
         accum.append("\n").append(StringUtil.padding(depth * out.indentAmount()));
     }
 
     /**
-     * Check if this node is equal to another node. A node is considered equal if its attributes and content equal the
-     * other node; particularly its position in the tree does not influence its equality.
+     * Check if this node is the same instance of another (object identity test).
      * @param o other object to compare to
      * @return true if the content of this node is the same as the other
+     * @see Node#hasSameValue(Object) to compare nodes by their value
      */
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        Node node = (Node) o;
-
-        if (childNodes != null ? !childNodes.equals(node.childNodes) : node.childNodes != null) return false;
-        return !(attributes != null ? !attributes.equals(node.attributes) : node.attributes != null);
+        // implemented just so that javadoc is clear this is an identity test
+        return this == o;
     }
 
     /**
-     * Calculates a hash code for this node, which includes iterating all its attributes, and recursing into any child
-     * nodes. This means that a node's hashcode is based on it and its child content, and not its parent or place in the
-     * tree. So two nodes with the same content, regardless of their position in the tree, will have the same hashcode.
-     * @return the calculated hashcode
-     * @see Node#equals(Object)
+     * Check if this node is has the same content as another node. A node is considered the same if its name, attributes and content match the
+     * other node; particularly its position in the tree does not influence its similarity.
+     * @param o other object to compare to
+     * @return true if the content of this node is the same as the other
      */
-    @Override
-    public int hashCode() {
-        int result = childNodes != null ? childNodes.hashCode() : 0;
-        result = 31 * result + (attributes != null ? attributes.hashCode() : 0);
-        return result;
+
+    public boolean hasSameValue(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        return this.outerHtml().equals(((Node) o).outerHtml());
     }
 
     /**
@@ -659,21 +665,30 @@ public abstract class Node implements Cloneable {
     }
 
     private static class OuterHtmlVisitor implements NodeVisitor {
-        private StringBuilder accum;
+        private Appendable accum;
         private Document.OutputSettings out;
 
-        OuterHtmlVisitor(StringBuilder accum, Document.OutputSettings out) {
+        OuterHtmlVisitor(Appendable accum, Document.OutputSettings out) {
             this.accum = accum;
             this.out = out;
         }
 
         public void head(Node node, int depth) {
-            node.outerHtmlHead(accum, depth, out);
+            try {
+				node.outerHtmlHead(accum, depth, out);
+			} catch (IOException exception) {
+				throw new SerializationException(exception);
+			}
         }
 
         public void tail(Node node, int depth) {
-            if (!node.nodeName().equals("#text")) // saves a void hit.
-                node.outerHtmlTail(accum, depth, out);
+            if (!node.nodeName().equals("#text")) { // saves a void hit.
+				try {
+					node.outerHtmlTail(accum, depth, out);
+				} catch (IOException exception) {
+					throw new SerializationException(exception);
+				}
+            }
         }
     }
 }
